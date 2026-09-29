@@ -1,0 +1,55 @@
+name: CI Build & Test
+
+on:
+    push:
+        branches: ["main"]
+    pull_request:
+        branches: ["main"]
+
+jobs:
+    # JOB 1: Quick verification (Runs once on cheap Linux runner)
+    lint-and-audit:
+        name: Code Style & Security Audit
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: "9.0.x" # Set to your .NET version (e.g. 8.0.x or 9.0.x)
+
+            - name: Restore dependencies
+              run: dotnet restore
+
+            - name: Verify Code Formatting
+              run: dotnet format --verify-no-changes --verbosity diagnostic
+
+            - name: Check for Vulnerable Packages
+              run: dotnet list package --vulnerable --include-transitive
+
+    # JOB 2: Cross-Platform Build & Test Matrix
+    build-and-test:
+        name: Test on ${{ matrix.os }}
+        needs: lint-and-audit # Only run after formatting passes
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: "9.0.x"
+
+            - name: Restore dependencies
+              run: dotnet restore
+
+            - name: Build Solution
+              run: dotnet build --no-restore --configuration Release
+
+            - name: Run Unit Tests
+              run: dotnet test --no-build --configuration Release --verbosity normal
