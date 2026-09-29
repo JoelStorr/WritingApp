@@ -1,16 +1,16 @@
 using System;
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Markdig;
 using WritingApp.Models;
+using WritingApp.Services;
 
 namespace WritingApp.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
+    private readonly IManuscriptService _manuscriptService;
+
     [ObservableProperty]
     public partial ObservableCollection<ChapterItem> Chapters { get; set; } = new();
 
@@ -29,48 +29,78 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusMessage { get; set; } = "Ready";
 
+    // 1. Primary Constructor: Used at runtime by the DI container
+    public MainViewModel(IManuscriptService manuscriptService)
+    {
+        _manuscriptService = manuscriptService;
+    }
+
+    // 2. Design-time Constructor: Used by the Avalonia XAML previewer
+    public MainViewModel() : this(new ManuscriptService())
+    {
+    }
+
     public async Task LoadFolderAsync(string folderPath)
     {
-        if (!Directory.Exists(folderPath)) return;
-
-        CurrentFolderPath = folderPath;
-        Chapters.Clear();
-
-        // Scan folder for Markdown files (.md)
-        var files = Directory.GetFiles(folderPath, "*.md", SearchOption.TopDirectoryOnly)
-                             .OrderBy(f => f);
-
-        foreach (var file in files)
+        try
         {
-            var fileInfo = new FileInfo(file);
-            var content = await File.ReadAllTextAsync(file);
+            CurrentFolderPath = folderPath;
+            Chapters.Clear();
 
-            Chapters.Add(new ChapterItem
+            // Delegated to the service
+            var loadedChapters = await _manuscriptService.LoadChaptersFromFolderAsync(folderPath);
+            foreach (var chapter in loadedChapters)
             {
-                Title = Path.GetFileNameWithoutExtension(fileInfo.Name),
-                FilePath = file,
-                Content = content
-            });
+                Chapters.Add(chapter);
+            }
+
+            StatusMessage = $"Loaded {Chapters.Count} chapter(s).";
+
+            if (Chapters.Count > 0)
+            {
+                SelectedChapter = Chapters[0];
+                UpdateContent(SelectedChapter.Content);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to load folder: {ex.Message}";
+        }
+    }
+
+    public async Task CreateChapterAsync(string rawTitle)
+    {
+        if (string.IsNullOrWhiteSpace(CurrentFolderPath))
+        {
+            StatusMessage = "Please open a folder first!";
+            return;
         }
 
-        StatusMessage = $"Loaded {Chapters.Count} chapter(s).";
-
-        // Select the first chapter automatically
-        if (Chapters.Count > 0)
+        try
         {
-            SelectedChapter = Chapters[0];
-            UpdateContent(SelectedChapter.Content);
+            // Delegated to the service
+            var newChapter = await _manuscriptService.CreateChapterAsync(CurrentFolderPath, rawTitle);
+
+            Chapters.Add(newChapter);
+            SelectedChapter = newChapter;
+            UpdateContent(newChapter.Content);
+
+            StatusMessage = $"Created '{newChapter.Title}'";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
         }
     }
 
     public async Task SaveCurrentChapterAsync()
     {
-        if (SelectedChapter == null || string.IsNullOrEmpty(SelectedChapter.FilePath))
-            return;
+        if (SelectedChapter == null) return;
 
         try
         {
-            await File.WriteAllTextAsync(SelectedChapter.FilePath, SelectedChapter.Content);
+            // Delegated to the service
+            await _manuscriptService.SaveChapterAsync(SelectedChapter);
             StatusMessage = $"Saved: {SelectedChapter.Title}";
         }
         catch (Exception ex)
@@ -86,70 +116,8 @@ public partial class MainViewModel : ViewModelBase
             SelectedChapter.Content = markdownText;
         }
 
-        string plainText = Markdown.ToPlainText(markdownText ?? string.Empty);
-
-        CharCount = plainText.Length;
-        WordCount = string.IsNullOrWhiteSpace(plainText)
-            ? 0
-            : plainText.Split(new[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length;
-    }
-
-    public async Task CreateChapterAsync(string rawTitle)
-    {
-        if (string.IsNullOrWhiteSpace(CurrentFolderPath))
-        {
-            StatusMessage = "Please open a folder first!";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(rawTitle))
-        {
-            StatusMessage = "Chapter name cannot be empty.";
-            return;
-        }
-
-        // Sanitize illegal filename characters
-        string sanitizedTitle = rawTitle.Trim();
-        foreach (char invalidChar in Path.GetInvalidFileNameChars())
-        {
-            sanitizedTitle = sanitizedTitle.Replace(invalidChar, '_');
-        }
-
-        // Ensure it ends with .md
-        string fileName = sanitizedTitle.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
-            ? sanitizedTitle
-            : $"{sanitizedTitle}.md";
-
-        string fullPath = Path.Combine(CurrentFolderPath, fileName);
-
-        if (File.Exists(fullPath))
-        {
-            StatusMessage = $"'{fileName}' already exists!";
-            return;
-        }
-
-        try
-        {
-            // Initial content (or keep string.Empty for a blank file)
-            string initialContent = $"# {Path.GetFileNameWithoutExtension(fileName)}\n\n";
-            await File.WriteAllTextAsync(fullPath, initialContent);
-
-            var newChapter = new ChapterItem
-            {
-                Title = Path.GetFileNameWithoutExtension(fileName),
-                FilePath = fullPath,
-                Content = initialContent
-            };
-
-            Chapters.Add(newChapter);
-            SelectedChapter = newChapter;
-            UpdateContent(newChapter.Content);
-
-            StatusMessage = $"Created '{fileName}'";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error creating file: {ex.Message}";
-        }
+        // Delegated to the service
+        WordCount = _manuscriptService.CalculateWordCount(markdownText);
+        CharCount = markdownText?.Length ?? 0;
     }
 }
