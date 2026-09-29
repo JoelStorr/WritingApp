@@ -15,12 +15,12 @@
     </Design.DataContext>
 
     <Grid ColumnDefinitions="250, 4, *, 4, 250">
-        
+
         <!-- PANE 1: Chapters Sidebar -->
         <Border Grid.Column="0" Background="#1A1A1A" Padding="10">
             <DockPanel>
                 <TextBlock Text="MANUSCRIPT" FontWeight="Bold" Margin="0,0,0,10" DockPanel.Dock="Top" Foreground="#AAAAAA"/>
-                <ListBox ItemsSource="{Binding Chapters}" 
+                <ListBox ItemsSource="{Binding Chapters}"
                          SelectedItem="{Binding SelectedChapter}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -52,14 +52,14 @@
         <Border Grid.Column="4" Background="#1A1A1A" Padding="15">
             <StackPanel Spacing="10">
                 <TextBlock Text="INSPECTOR" FontWeight="Bold" Foreground="#AAAAAA" Margin="0,0,0,10"/>
-                
+
                 <TextBlock Text="Active Chapter:" Foreground="#888888" FontSize="12"/>
                 <TextBlock Text="{Binding SelectedChapter.Title, FallbackValue='None'}" FontWeight="SemiBold" TextWrapping="Wrap"/>
 
                 <Separator Margin="0,10"/>
 
                 <TextBlock Text="STATISTICS" FontWeight="Bold" Foreground="#AAAAAA"/>
-                
+
                 <StackPanel Orientation="Horizontal" Spacing="5">
                     <TextBlock Text="Words:" Foreground="#888888"/>
                     <TextBlock Text="{Binding WordCount}" FontWeight="Bold"/>
@@ -71,7 +71,7 @@
                 </StackPanel>
             </StackPanel>
         </Border>
-        
+
     </Grid>
-   
+
 </Window>
