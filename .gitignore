@@ -1,0 +1,83 @@
+## ===================================================
+## .NET & Build Outputs
+## ===================================================
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.lock
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Visual Studio test results & profiling
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+## ===================================================
+## IDEs & Editors
+## ===================================================
+
+### Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+### JetBrains Rider
+.idea/
+*.sln.iml
+
+### Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## ===================================================
+## Avalonia & Cross-Platform Specifics
+## ===================================================
+
+# Android / iOS platform artifacts (if building mobile with Avalonia)
+*.apk
+*.aab
+*.ipa
+*.dSYM/
+*.app/
+
+# WebAssembly build artifacts (if targeting Browser via Avalonia)
+bin/Release/*/publish/wwwroot/_framework/
+
+## ===================================================
+## User Secrets, Local Configs & Environment Files
+## ===================================================
+.env
+*.local.json
+appsettings.Development.json
+secrets.json
+
+## ===================================================
+## Operating System Junk
+## ===================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.directory
