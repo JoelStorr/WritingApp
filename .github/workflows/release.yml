@@ -1,0 +1,103 @@
+name: Build & Release
+
+on:
+    push:
+        branches:
+            - develop
+            - main
+
+permissions:
+    contents: write
+
+jobs:
+    publish-binaries:
+        name: Publish for ${{ matrix.target.os }} (${{ matrix.target.rid }})
+        runs-on: ${{ matrix.target.os }}
+        strategy:
+            matrix:
+                target:
+                    - os: windows-latest
+                      rid: win-x64
+                      archive_ext: zip
+                    - os: ubuntu-latest
+                      rid: linux-x64
+                      archive_ext: tar.gz
+                    - os: macos-latest
+                      rid: osx-arm64
+                      archive_ext: zip
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: "9.0.x"
+
+            # Publish self-contained standalone executable
+            - name: Publish App
+              run: >
+                  dotnet publish WritingApp/WritingApp.csproj
+                  -c Release
+                  -r ${{ matrix.target.rid }}
+                  --self-contained true
+                  -p:PublishSingleFile=true
+                  -o ./publish
+
+            # Package Windows as .zip
+            - name: Archive Binary (Windows)
+              if: matrix.target.os == 'windows-latest'
+              shell: pwsh
+              run: Compress-Archive -Path ./publish/* -DestinationPath WritingApp-${{ matrix.target.rid }}.zip
+
+            # Package Linux as .tar.gz
+            - name: Archive Binary (Linux)
+              if: matrix.target.os == 'ubuntu-latest'
+              run: tar -czvf WritingApp-${{ matrix.target.rid }}.tar.gz -C ./publish .
+
+            # Package macOS as .zip
+            - name: Archive Binary (macOS)
+              if: matrix.target.os == 'macos-latest'
+              run: zip -r WritingApp-${{ matrix.target.rid }}.zip ./publish
+
+            # Upload individual asset to pipeline runner
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: WritingApp-${{ matrix.target.rid }}
+                  path: WritingApp-${{ matrix.target.rid }}.${{ matrix.target.archive_ext }}
+
+    create-github-release:
+        name: Create GitHub Release
+        needs: publish-binaries
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Download all published artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: ./release-assets
+                  merge-multiple: true
+
+            - name: Set Release Metadata
+              id: vars
+              run: |
+                  if [ "${{ github.ref_name }}" = "main" ]; then
+                    echo "tag=v0.1.${{ github.run_number }}" >> $GITHUB_OUTPUT
+                    echo "title=WritingApp Release v0.1.${{ github.run_number }}" >> $GITHUB_OUTPUT
+                    echo "prerelease=false" >> $GITHUB_OUTPUT
+                  else
+                    echo "tag=v0.1.${{ github.run_number }}-beta" >> $GITHUB_OUTPUT
+                    echo "title=WritingApp Beta v0.1.${{ github.run_number }}-preview" >> $GITHUB_OUTPUT
+                    echo "prerelease=true" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Publish GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.vars.outputs.tag }}
+                  name: ${{ steps.vars.outputs.title }}
+                  prerelease: ${{ steps.vars.outputs.prerelease == 'true' }}
+                  generate_release_notes: true
+                  files: ./release-assets/*
